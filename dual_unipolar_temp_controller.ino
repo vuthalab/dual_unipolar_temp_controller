@@ -5,27 +5,41 @@
 #define ZEROV 32768 //Zero volts
 
 struct Params {
+  unsigned int enable0;
+  unsigned int set_temp0;
+  float prop_gain0;
+  float pi_pole0;
+  float pd_pole0;
+
+  unsigned int enable1;
+  unsigned int set_temp1;
+  float prop_gain1;
+  float pi_pole1;
+  float pd_pole1;
+  
+};
+
+struct Logger {
   unsigned int act_temp0;
   unsigned int act_temp1;
-
-  unsigned int set_temp0;
-  unsigned int set_temp1;
 
   unsigned int gate_voltage0;
   unsigned int gate_voltage1;
 
   int error_signal0;
   int error_signal1;
+  
 };
 
 Params params;
+Logger logger;
 
 float toVoltage(unsigned int bits) {
-  return ((float)(bits)-32768)/6553.6; // Convert a number of bits 0<b<65536 to a voltage -5V<V<5V 
+  return ((float)(bits-ZEROV))/6553.6; // Convert a number of bits 0<b<65536 to a voltage -5V<V<5V 
 }
 
-float toBits(float voltage) {
-  return voltage*6553.6+32768; // Convert a voltage -5V<V<5V to a number of bits 0<b<65536
+unsigned int toBits(float voltage) {
+  return voltage*6553.6+ZEROV; // Convert a voltage -5V<V<5V to a number of bits 0<b<65536
 }
 
 void setup() {
@@ -66,6 +80,11 @@ void parseSerial() {
   if(byte_read == 'g') {
     // get params, send the entire struct in one go
     Serial.write((const uint8_t*)&params, sizeof(Params));
+  
+  }
+  if(byte_read == 'l') {
+    // send the logger data
+    Serial.write((const uint8_t*)&logger, sizeof(Logger));
   
   }
   if(byte_read == 'i') {
