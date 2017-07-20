@@ -1,7 +1,7 @@
 from PyQt4 import QtGui, QtCore, uic
 from pyqtgraph.dockarea import DockArea, Dock
 import os
-from widgets.BlankWidget import BlankWidget
+from widgets.DualTempCont import DualTempCont
 
 
 class MainWindow(QtGui.QMainWindow):
@@ -19,15 +19,16 @@ class MainWindow(QtGui.QMainWindow):
         self.createDocks()
 
         self.loadSettings()
+        self.setWindowTitle('Dual Temperature Controller')
 
     def setupUi(self):
         pass
 
     def createDocks(self):
-        self.blank_widget = BlankWidget(self.settings, self)
-        self.blank_widget_dock = Dock('Blank Widget',
-                                        widget=self.blank_widget)
-        self.dock_area.addDock(self.blank_widget_dock)
+        self.dual_temp_cont = DualTempCont(self.settings, self)
+        self.dual_temp_cont_dock = Dock('Dual Temp. Cont.',
+                                        widget=self.dual_temp_cont)
+        self.dock_area.addDock(self.dual_temp_cont_dock)
 
     def loadSettings(self):
         """Load window state from self.settings"""
@@ -57,5 +58,5 @@ class MainWindow(QtGui.QMainWindow):
         self.settings.endGroup()
 
     def closeEvent(self, event):
-        self.blank_widget.saveSettings()
+        self.dual_temp_cont.saveSettings()
         self.saveSettings()

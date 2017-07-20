@@ -32,16 +32,5 @@ class DualUnipolarTemperatureController:
         self.ser.close()
 
 
-dutc = DualUnipolarTemperatureController()
-
-# struct_size =   2 + 4 + 1
-
-
-# for i in range(200):
-#     ser.write(b'g')
-#     data = ser.read(struct_size)
-#     print (repr(data))
-#     print(struct.unpack('<H', data))
-
-
-# ser.close()
+if __name__ == '__main__':
+    dutc = DualUnipolarTemperatureController()
