@@ -1,18 +1,24 @@
 #include <analogShield.h>
 
+#define UNO_ID "DUAL_TEMP_CO_0\r\n"
+
+#define ZEROV 32768 //Zero volts
+
 struct Params {
-  float act_temp0;
-  float act_temp1;
+  unsigned int act_temp0;
+  unsigned int act_temp1;
 
-  float set_temp0;
-  float set_temp1;
+  unsigned int set_temp0;
+  unsigned int set_temp1;
 
-  float gate_voltage0;
-  float gate_voltage1;
-  
-} params;
+  unsigned int gate_voltage0;
+  unsigned int gate_voltage1;
 
-unsigned int zerov = 32768; //Zero volts
+  int error_signal0;
+  int error_signal1;
+};
+
+Params params;
 
 float toVoltage(unsigned int bits) {
   return ((float)(bits)-32768)/6553.6; // Convert a number of bits 0<b<65536 to a voltage -5V<V<5V 
@@ -27,30 +33,53 @@ void setup() {
   /* Open serial communications, initialize output ports: */
   Serial.begin(115200);
 
-  params.gate_voltage0 = 0.0;
-  params.gate_voltage1 = 0.0;
+  params.gate_voltage0 = ZEROV;
+  params.gate_voltage1 = ZEROV;
 
-  params.set_temp0 = 0.0;
-  params.set_temp1 = 0.0;
+  params.set_temp0 = ZEROV;
+  params.set_temp1 = ZEROV;
 
-  analog.write(toBits(params.set_temp0), toBits(params.set_temp1),
-               toBits(params.gate_voltage0),toBits(params.gate_voltage1),
+  analog.write(params.set_temp0, params.set_temp1,
+               params.gate_voltage0,params.gate_voltage1,
                true);
 }
 
 // note heating thermistor makes the voltage negative
 void loop() {
-  // put your main code here, to run repeatedly:
-  params.act_temp0 = toVoltage(analog.read(0, true));
-  params.act_temp1 = toVoltage(analog.read(2, true));
-
-  analog.write(toBits(params.set_temp0), toBits(params.set_temp1),
-               toBits(params.gate_voltage0),toBits(params.gate_voltage1),
-               true);
-
+  if(Serial.available())
+    parseSerial();
   
-  Serial.print("\n\n");
-  Serial.print(params.act_temp0);
-  Serial.print("\n");
-  Serial.print(params.act_temp1);
+  params.act_temp0 = analog.read(0, false);
+  params.act_temp1 = analog.read(2, false);
+
+  params.error_signal0 = analog.read(0, false) - ZEROV;
+  params.error_signal1 = analog.read(2, true) - ZEROV;
+  
+  analog.write(params.set_temp0, params.set_temp1,
+               params.gate_voltage0,params.gate_voltage1,
+               true);
 }
+
+
+void parseSerial() {
+  char byte_read = Serial.read();
+  if(byte_read == 'g') {
+    // get params, send the entire struct in one go
+    Serial.write((const uint8_t*)&params, sizeof(Params));
+  
+  }
+  if(byte_read == 'i') {
+    // return ID
+    Serial.write(UNO_ID);
+  
+  }
+  if(byte_read == 's') {
+    // read in size(Params) bytes
+    Params params_temp;
+    int bytes_read = Serial.readBytes((char *) &params_temp, sizeof(Params));
+    // check for validity of parameters
+    params = params_temp;
+  }
+}
+
+
