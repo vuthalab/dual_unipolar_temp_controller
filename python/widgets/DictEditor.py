@@ -148,6 +148,8 @@ class NamedEditor(QtGui.QWidget):
         sub_widget.mySetValue(value)
         sub_widget.myValueChanged.connect(self.handleValueChanged)
 
+        self.sub_widget = sub_widget
+
         grid.addWidget(name_label, row, 0)
         grid.addWidget(sub_widget, row, 1)
 
@@ -155,6 +157,10 @@ class NamedEditor(QtGui.QWidget):
 
     def handleValueChanged(self, new_value):
         self.valueChanged.emit(self.name, new_value)
+
+    def updateValue(self, newValue):
+        self.sub_widget.mySetValue(newValue)
+
 
 
 
@@ -169,13 +175,14 @@ class OrderedDictEditor(QtGui.QWidget):
         self.setLayout(grid)
         self.dct = dct
 
+        self.named_widgets = []
+
         for i, (key, value) in enumerate(dct.items()):
             key_type = type(value)
-            print key_type
             if key_type in widgets_for_type:
-                print('i am in')
                 named_widget = NamedEditor(key, value, grid, i, self)
                 named_widget.valueChanged.connect(self.handleValueChanged)
+                self.named_widgets.append(named_widget)
                 grid.addWidget(named_widget, i, 0)
 
     def handleValueChanged(self, key_name, new_value):
@@ -184,6 +191,10 @@ class OrderedDictEditor(QtGui.QWidget):
         self.dct[str(key_name)] = new_value
 
         self.valueChanged.emit()
+
+    def updateValues(self):
+        for i, (key, value) in enumerate(self.dct.items()):
+            self.named_widgets[i].updateValue(value)
 
 
 

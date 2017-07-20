@@ -47,14 +47,14 @@ void setup() {
   /* Open serial communications, initialize output ports: */
   Serial.begin(115200);
 
-  params.gate_voltage0 = ZEROV;
-  params.gate_voltage1 = ZEROV;
+  logger.gate_voltage0 = ZEROV;
+  logger.gate_voltage1 = ZEROV;
 
   params.set_temp0 = ZEROV;
   params.set_temp1 = ZEROV;
 
   analog.write(params.set_temp0, params.set_temp1,
-               params.gate_voltage0,params.gate_voltage1,
+               logger.gate_voltage0,logger.gate_voltage1,
                true);
 }
 
@@ -63,14 +63,14 @@ void loop() {
   if(Serial.available())
     parseSerial();
   
-  params.act_temp0 = analog.read(0, false);
-  params.act_temp1 = analog.read(2, false);
+  logger.act_temp0 = analog.read(0, false);
+  logger.act_temp1 = analog.read(2, false);
 
-  params.error_signal0 = analog.read(0, false) - ZEROV;
-  params.error_signal1 = analog.read(2, true) - ZEROV;
+  logger.error_signal0 = analog.read(0, false) - ZEROV;
+  logger.error_signal1 = analog.read(2, true) - ZEROV;
   
   analog.write(params.set_temp0, params.set_temp1,
-               params.gate_voltage0,params.gate_voltage1,
+               logger.gate_voltage0,logger.gate_voltage1,
                true);
 }
 

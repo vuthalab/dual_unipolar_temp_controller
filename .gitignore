@@ -1,1 +1,4 @@
 .pyc
+*.pyc
+python/widgets/MainWindow.pyc
+python/settings.ini

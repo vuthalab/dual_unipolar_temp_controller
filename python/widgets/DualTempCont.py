@@ -2,6 +2,7 @@ from PyQt4 import QtGui, QtCore, uic
 import os
 from widgets.DictEditor import OrderedDictEditor
 from collections import OrderedDict
+from arduino_serial import DualUnipolarTemperatureController
 
 default_data_dict = OrderedDict([
         ('Servo Enable 0:', False),
@@ -25,6 +26,7 @@ class DualTempCont(QtGui.QWidget):
         self.settings = settings
         self.loadSettings()
         self.setupUi()
+        self.dutc = DualUnipolarTemperatureController('COM15')
 
     def setupUi(self):
         self.grid = QtGui.QGridLayout(self)
@@ -56,20 +58,45 @@ class DualTempCont(QtGui.QWidget):
 
     def handleUploadClicked(self):
         value_tuple = self.data_dict.values()
-        (set_r0, pgain0, pi_pole0, pd_pole0, enable0) = value_tuple[:5]
-        (set_r1, pgain1, pi_pole1, pd_pole1, enable1) = value_tuple[5:]
+        (enable0, set_r0, pgain0, pi_pole0, pd_pole0) = value_tuple[:5]
+        (enable1, set_r1, pgain1, pi_pole1, pd_pole1) = value_tuple[5:]
 
         # set voltage dac value
-        print(set_r0)
-        print(set_r1)
         set_v_dac0 = int((set_r0 - 10.)/(set_r0 + 10.)*ZEROV + ZEROV)
         set_v_dac1 = int((set_r1 - 10.)/(set_r1 + 10.)*ZEROV + ZEROV)
 
-        print(set_v_dac0)
-        print(set_v_dac1)
+        data_tuple = (int(enable0), set_v_dac0, pgain0, pi_pole0, pd_pole0,
+            int(enable1), set_v_dac1, pgain1, pi_pole1, pd_pole1)
+
+        print('upload', data_tuple)
+        print(self.dutc.set_params(data_tuple, True))
+
 
     def handleDownloadClicked(self):
-        print('download')
+        out = self.dutc.get_params(True)
+
+        data_tuple = out[0]
+        print('download', data_tuple)
+
+        set_v_dac0 = data_tuple[1]
+        set_v_dac1 = data_tuple[6]
+
+        v0 = float(set_v_dac0 - ZEROV)/ZEROV
+        v1 = float(set_v_dac1 - ZEROV)/ZEROV
+
+        set_r0 = (1.+v0)/(1-v0)*10
+        set_r1 = (1.+v1)/(1-v1)*10
+
+        data_list = list(data_tuple)
+        data_list[0] = bool(data_tuple[0])
+        data_list[1] = set_r0
+        data_list[5] = bool(data_tuple[5])
+        data_list[6] = set_r1
+
+        for i, k in enumerate(self.data_dict.iterkeys()):
+            self.data_dict[k] = data_list[i]
+
+        self.data_editor.updateValues()
 
     def handleLoadFromEepromClicked(self):
         print('loadfromeeprom')

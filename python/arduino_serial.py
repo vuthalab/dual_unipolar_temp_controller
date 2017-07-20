@@ -54,8 +54,8 @@ class DualUnipolarTemperatureController:
     def get_params(self, get_read_write_string=False):
         write_string = b'g'
         self.ser.write(write_string)
-        data = self.ser.read(self.params_struct_size)
-        data_tuple = struct.unpack(self.params_struct_fmt, data)
+        data = self.ser.read(params_struct_size)
+        data_tuple = struct.unpack(params_struct_fmt, data)
         if get_read_write_string:
             return data_tuple, write_string, data
         else:
@@ -64,17 +64,22 @@ class DualUnipolarTemperatureController:
     def get_logger(self, get_read_write_string=False):
         write_string = b'l'
         self.ser.write(write_string)
-        data = self.ser.read(self.logger_struct_fmt)
-        data_tuple = struct.unpack(self.logger_struct_fmt, data)
+        data = self.ser.read(logger_struct_fmt)
+        data_tuple = struct.unpack(logger_struct_fmt, data)
         if get_read_write_string:
             return data_tuple, write_string, data
         else:
             return data_tuple
 
-    def set(self, data_tuple):
-        self.ser.write(b's')
-        data = struct.pack(self.struct_fmt, *data_tuple)
+    def set_params(self, data_tuple, get_read_write_string=False):
+        write_string = b's'
+        self.ser.write(write_string)
+        data = struct.pack(params_struct_fmt, *data_tuple)
         self.ser.write(data)
+        if get_read_write_string:
+          return write_string+data
+        else:
+          return None
 
     def close(self):
         self.ser.close()
