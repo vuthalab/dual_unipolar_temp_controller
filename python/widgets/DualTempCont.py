@@ -3,6 +3,7 @@ import os
 from widgets.DictEditor import OrderedDictEditor
 from collections import OrderedDict
 from arduino_serial import DualUnipolarTemperatureController
+import numpy as np
 
 default_data_dict = OrderedDict([
         ('Servo Enable 0:', False),
@@ -16,6 +17,17 @@ default_data_dict = OrderedDict([
         ('PI Pole 1 (Hz):', 2.0),
         ('PD Pole 1 (Hz):', 10.)])
 
+
+
+default_logger_dict = OrderedDict([
+        ('Gate Voltage 0 (V):', 0.0),
+        ('Gate Voltage 1 (V):', 0.0),
+        ('Error signal 0 (V):', 0.0),
+        ('Error signal 1 (V):', 0.0),
+        ('Accumulator 0 (V):', 0.0),
+        ('Accumulator 1 (V):', 0.0),
+        ('dt (s):', 0.0)])
+
 ZEROV = 2**15
 
 
@@ -24,9 +36,17 @@ class DualTempCont(QtGui.QWidget):
     def __init__(self, settings, parent=None):
         super(DualTempCont, self).__init__(parent)
         self.settings = settings
+        self.logger_dict = OrderedDict(default_logger_dict)
+
         self.loadSettings()
         self.setupUi()
+
         self.dutc = DualUnipolarTemperatureController('COM15')
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.updateLogs)
+        self.n_timer_events = 0
+        self.timer.start(200)
 
     def setupUi(self):
         self.grid = QtGui.QGridLayout(self)
@@ -53,8 +73,26 @@ class DualTempCont(QtGui.QWidget):
         self.save_to_eeprom_button.clicked.connect(self.handleSaveToEepromClicked)
         self.grid.addWidget(self.save_to_eeprom_button, rowStart + 1, 1)
 
+        self.data_logger = OrderedDictEditor(self.logger_dict, self)
+        self.grid.addWidget(self.data_logger, rowStart + 2, 0, len(default_logger_dict), 2)
+
     def handleDictValueChanged(self):
         pass
+
+    def updateLogs(self):
+        self.n_timer_events += 1
+        if self.n_timer_events > 20:
+            out = self.dutc.get_logger(True)
+            log_tuple = out[0]
+            print(log_tuple)
+            offset = np.array([1., 1., 0., 0.])
+            voltages = list((np.array(log_tuple[:4], dtype=float)/ZEROV - offset)*5.0)
+            logdata_list = list(voltages) + list(log_tuple[4:])
+
+            for i, k in enumerate(self.logger_dict.iterkeys()):
+                self.logger_dict[k] = logdata_list[i]
+
+            self.data_logger.updateValues()
 
     def handleUploadClicked(self):
         value_tuple = self.data_dict.values()

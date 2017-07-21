@@ -21,9 +21,6 @@ struct Params {
 
 
 struct Logger {
-  unsigned int act_temp0;
-  unsigned int act_temp1;
-
   unsigned int gate_voltage0;
   unsigned int gate_voltage1;
 
@@ -37,8 +34,8 @@ struct Logger {
 params_struct_size = 2*4 + 4*6
 params_struct_fmt = '<HHfffHHfff'
 
-logger_struct_size = 2*6
-logger_struct_fmt = '<HHHHhh'
+logger_struct_size = 2*4 + 4*3
+logger_struct_fmt = '<HHhhfff'
 
 
 class DualUnipolarTemperatureController:
@@ -64,7 +61,7 @@ class DualUnipolarTemperatureController:
     def get_logger(self, get_read_write_string=False):
         write_string = b'l'
         self.ser.write(write_string)
-        data = self.ser.read(logger_struct_fmt)
+        data = self.ser.read(logger_struct_size)
         data_tuple = struct.unpack(logger_struct_fmt, data)
         if get_read_write_string:
             return data_tuple, write_string, data
