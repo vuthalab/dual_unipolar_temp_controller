@@ -85,9 +85,9 @@ class DualTempCont(QtGui.QWidget):
             out = self.dutc.get_logger(True)
             log_tuple = out[0]
             print(log_tuple)
-            offset = np.array([1., 1., 0., 0.])
-            voltages = list((np.array(log_tuple[:4], dtype=float)/ZEROV - offset)*5.0)
-            logdata_list = list(voltages) + list(log_tuple[4:])
+            offset = np.array([1., 1.])
+            voltages = list((np.array(log_tuple[:2], dtype=float)/ZEROV - offset)*5.0)
+            logdata_list = list(voltages) + list(log_tuple[2:])
 
             for i, k in enumerate(self.logger_dict.iterkeys()):
                 self.logger_dict[k] = logdata_list[i]
@@ -137,10 +137,10 @@ class DualTempCont(QtGui.QWidget):
         self.data_editor.updateValues()
 
     def handleLoadFromEepromClicked(self):
-        print('loadfromeeprom')
+        self.dutc.load_from_eeprom()
 
     def handleSaveToEepromClicked(self):
-        print('savetoeeprom')
+        self.dutc.save_to_eeprom()
 
     def loadSettings(self):
         self.settings.beginGroup('DualTempCont')

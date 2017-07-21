@@ -34,8 +34,8 @@ struct Logger {
 params_struct_size = 2*4 + 4*6
 params_struct_fmt = '<HHfffHHfff'
 
-logger_struct_size = 2*4 + 4*3
-logger_struct_fmt = '<HHhhfff'
+logger_struct_size = 2*2 + 4*5
+logger_struct_fmt = '<HHfffff'
 
 
 class DualUnipolarTemperatureController:
@@ -77,6 +77,12 @@ class DualUnipolarTemperatureController:
           return write_string+data
         else:
           return None
+
+    def load_from_eeprom(self):
+        self.ser.write(b'r')
+
+    def save_to_eeprom(self):
+        self.ser.write(b'w')
 
     def close(self):
         self.ser.close()

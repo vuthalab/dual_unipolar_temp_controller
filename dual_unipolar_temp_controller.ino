@@ -1,8 +1,12 @@
+#include <EEPROM.h>
+#include <Arduino.h>  // for type definitions
+
 #include <analogShield.h>
 
 #define UNO_ID "DUAL_TEMP_CO_0\r\n"
 #define GATE_VOLTAGE_MIN 1.5
 #define GATE_VOLTAGE_MAX 3.0
+#define N_ACCUM 100
 
 #define ZEROV 32768 //Zero volts
 
@@ -26,8 +30,8 @@ struct Logger {
   unsigned int gate_voltage0;
   unsigned int gate_voltage1;
 
-  int error_signal0;
-  int error_signal1;
+  float error_signal0;
+  float error_signal1;
 
   float accumulator0;
   float accumulator1;
@@ -39,19 +43,22 @@ struct Logger {
 Params params;
 Logger logger;
 
-bool top_clip0, top_clip1;
-bool bot_clip0, bot_clip1;
-
 unsigned long current_time;
 
 float accumulator_small0;
 float accumulator_small1;
 float prop_term0;
 float prop_term1;
+float derivative_term0;
+float derivative_term1;
+float error_signal_instant0;
+float error_signal_instant1;
 
 unsigned int n_accum0;
+unsigned int n_accum1;
 
-#define N_ACCUM_MAX 100
+float alpha_avg;
+
 
 float toVoltage(unsigned int bits) {
   return ((float)(bits-ZEROV))/6553.6; // Convert a number of bits 0<b<65536 to a voltage -5V<V<5V 
@@ -79,22 +86,23 @@ void setup() {
   accumulator_small1 = 0.0;
   prop_term0 = 0.0;
   prop_term1 = 0.0;
-
+  error_signal_instant0 = 0.0;
+  error_signal_instant0 = 0.0;
+  n_accum0 = 0;
+  
+  alpha_avg = 1./N_ACCUM;
+  
   analog.write(params.set_temp0, params.set_temp1,
                logger.gate_voltage0,logger.gate_voltage1,
                true);
 
+
+   EEPROM_readAnything(0, params);
+   EEPROM_readAnything(sizeof(params), logger);
    current_time = micros();  
-
-   top_clip0 = false;
-   top_clip1 = false;
-   bot_clip0 = false;
-   bot_clip1 = false;
-
-   n_accum0 = 0;
+   
 }
 
-// note heating thermistor makes the voltage negative
 void loop() {
   float previous_time = current_time;
   current_time = micros();
@@ -103,41 +111,41 @@ void loop() {
   if(Serial.available())
     parseSerial();
 
-  logger.error_signal0 = analog.read(0, true) - ZEROV;
-  logger.error_signal1 = analog.read(2, true) - ZEROV;
+  float error_signal_prev0 = error_signal_instant0;
+  float error_signal_prev1 = error_signal_instant1;
+
+  error_signal_instant0 = toVoltage(analog.read(0, true));
+  error_signal_instant1 = toVoltage(analog.read(0, true));
+
+  logger.error_signal0 = error_signal_instant0*alpha_avg + logger.error_signal0*(1.-alpha_avg);
+  logger.error_signal1 = error_signal_instant1*alpha_avg + logger.error_signal1*(1.-alpha_avg);
   
   if(params.enable0) {
-    float error_signal_0_float = ((float) logger.error_signal0)*5.0/ZEROV;
-    accumulator_small0 += error_signal_0_float*logger.dt_seconds;
+    accumulator_small0 += error_signal_instant0*logger.dt_seconds;
     n_accum0 += 1;
-    if(n_accum0 > N_ACCUM_MAX) {
+    if(n_accum0 > N_ACCUM) {
       n_accum0 = 0;
       logger.accumulator0 += accumulator_small0*params.prop_gain0*params.pi_pole0;
       accumulator_small0 = 0;
     }
 
-    prop_term0 = 0.99*prop_term0 + 0.01*(error_signal_0_float*params.prop_gain0);
+    prop_term0 = 0.99*prop_term0 + 0.01*(error_signal_instant0*params.prop_gain0);
+
+    float der_term = (error_signal_instant0 - error_signal_prev0)/logger.dt_seconds/params.pd_pole0;
+    derivative_term0 = 0.995*derivative_term0 + 0.005*(der_term*params.prop_gain0);
     
     float gv0 = logger.accumulator0 + prop_term0;
     
     if (gv0 > GATE_VOLTAGE_MAX) {
-      top_clip0 = true;
       gv0 = GATE_VOLTAGE_MAX;
       logger.accumulator0 = gv0;
     }
-    else {
-      top_clip0 = false;
-    }
     
     if (gv0 < GATE_VOLTAGE_MIN) {
-      bot_clip0 = true;
       gv0 = GATE_VOLTAGE_MIN;
       logger.accumulator0 = gv0;
     }
-    else {
-      bot_clip0 = false;
-    }
-    
+   
     logger.gate_voltage0 = toBits(gv0);
    
   }
@@ -161,6 +169,24 @@ void loop() {
 
 }
 
+template <class T> int EEPROM_writeAnything(int ee, const T& value)
+{
+    const byte* p = (const byte*)(const void*)&value;
+    unsigned int i;
+    for (i = 0; i < sizeof(value); i++)
+          EEPROM.write(ee++, *p++);
+    return i;
+}
+
+template <class T> int EEPROM_readAnything(int ee, T& value)
+{
+    byte* p = (byte*)(void*)&value;
+    unsigned int i;
+    for (i = 0; i < sizeof(value); i++)
+          *p++ = EEPROM.read(ee++);
+    return i;
+}
+
 void parseSerial() {
   char byte_read = Serial.read();
   if(byte_read == 'g') {
@@ -172,6 +198,15 @@ void parseSerial() {
     // send the logger data
     Serial.write((const uint8_t*)&logger, sizeof(Logger));
   
+  }
+  if(byte_read == 'w') {
+    // write to EEPROM
+    EEPROM_writeAnything(0, params);
+    EEPROM_writeAnything(sizeof(params), logger);
+  }
+  if(byte_read == 'r') {
+    EEPROM_readAnything(0, params);
+    EEPROM_readAnything(sizeof(params), logger);
   }
   if(byte_read == 'i') {
     // return ID
