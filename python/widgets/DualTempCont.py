@@ -4,6 +4,8 @@ from widgets.DictEditor import OrderedDictEditor
 from collections import OrderedDict
 from arduino_serial import DualUnipolarTemperatureController
 import numpy as np
+import zmq
+import time
 
 default_data_dict = OrderedDict([
         ('Servo Enable 0:', False),
@@ -18,7 +20,6 @@ default_data_dict = OrderedDict([
         ('PD Pole 1 (Hz):', 10.)])
 
 
-
 default_logger_dict = OrderedDict([
         ('Gate Voltage 0 (V):', 0.0),
         ('Gate Voltage 1 (V):', 0.0),
@@ -29,6 +30,28 @@ default_logger_dict = OrderedDict([
         ('dt (s):', 0.0)])
 
 ZEROV = 2**15
+
+class zmq_pub_dict:
+    """Publishes a python dictionary on a port with a given topic."""
+
+    def __init__(self, port, topic):
+        zmq_context = zmq.Context()
+        self.topic = topic
+        self.pub_socket = zmq_context.socket(zmq.PUB)
+
+        self.pub_socket.bind("tcp://*:%s" % port)
+        print('Broadcasting on port {0} with topic {1}'.format(port,
+                                                               topic))
+
+    def send(self, data_dict):
+        timestamp = time.time()
+        send_string = "%s %f %s" % (self.topic, timestamp, repr(data_dict))
+        self.pub_socket.send(send_string)
+
+    def close(self):
+        self.pub_socket.close()
+
+
 
 
 class DualTempCont(QtGui.QWidget):
@@ -47,6 +70,7 @@ class DualTempCont(QtGui.QWidget):
         self.timer.timeout.connect(self.updateLogs)
         self.n_timer_events = 0
         self.timer.start(200)
+        self.publisher = zmq_pub_dict('5561', 'dual_tempco')
 
     def setupUi(self):
         self.grid = QtGui.QGridLayout(self)
@@ -93,6 +117,7 @@ class DualTempCont(QtGui.QWidget):
                 self.logger_dict[k] = logdata_list[i]
 
             self.data_logger.updateValues()
+            self.publisher.send(dict(self.logger_dict))
 
     def handleUploadClicked(self):
         value_tuple = self.data_dict.values()

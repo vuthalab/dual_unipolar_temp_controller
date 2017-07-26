@@ -104,7 +104,7 @@ void setup() {
 }
 
 void loop() {
-  float previous_time = current_time;
+  unsigned long previous_time = current_time;
   current_time = micros();
   logger.dt_seconds = ((float)(current_time - previous_time))*1e-6;
   
@@ -115,7 +115,7 @@ void loop() {
   float error_signal_prev1 = error_signal_instant1;
 
   error_signal_instant0 = toVoltage(analog.read(0, true));
-  error_signal_instant1 = toVoltage(analog.read(0, true));
+  error_signal_instant1 = toVoltage(analog.read(2, true));
 
   logger.error_signal0 = error_signal_instant0*alpha_avg + logger.error_signal0*(1.-alpha_avg);
   logger.error_signal1 = error_signal_instant1*alpha_avg + logger.error_signal1*(1.-alpha_avg);
@@ -155,7 +155,33 @@ void loop() {
   }
 
   if(params.enable1) {
-    float error_signal_1_float = (float) logger.error_signal1;    
+    accumulator_small1 += error_signal_instant1*logger.dt_seconds;
+    n_accum1 += 1;
+
+    if(n_accum1 > N_ACCUM) {
+      n_accum1 = 0;
+      logger.accumulator1 += accumulator_small1*params.prop_gain1*params.pi_pole1;
+      accumulator_small1 = 0;
+    }
+
+    prop_term1 = 0.99*prop_term1 + 0.01*(error_signal_instant1*params.prop_gain1);
+
+    float der_term = (error_signal_instant1 - error_signal_prev1)/logger.dt_seconds/params.pd_pole1;
+    derivative_term1 = 0.995*derivative_term1 + 0.005*(der_term*params.prop_gain1);
+    
+    float gv1 = logger.accumulator1 + prop_term1;
+
+    if (gv1 > GATE_VOLTAGE_MAX) {
+      gv1 = GATE_VOLTAGE_MAX;
+      logger.accumulator1 = gv1;
+    }
+    
+    if (gv1 < GATE_VOLTAGE_MIN) {
+      gv1 = GATE_VOLTAGE_MIN;
+      logger.accumulator1 = gv1;
+    }
+   
+    logger.gate_voltage1 = toBits(gv1);
   }
   else{
     logger.gate_voltage1 = toBits(GATE_VOLTAGE_MIN);
